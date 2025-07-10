@@ -3,18 +3,37 @@
 # 微验网络验证部分保持不变
 echo "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
 
-# 云端配置
-CLOUD_BASE="https://cdn.jsdelivr.net/ghlullcrypto/hstools@main" # 替换为您的GitHub用户名
-TMP_DIR="/data/local/tmp/hstool" # Termux 临时目录
+# 修改1：使用 Termux 的可写目录
+TMP_DIR="$PREFIX/tmp/hstool" # 使用 Termux 的标准临时目录
 
 # 确保临时目录存在
 mkdir -p $TMP_DIR
 
-# 检查并下载二进制文件
+# 修改2：添加详细的错误处理
 if ! [ -e "$TMP_DIR/rc4" ]; then
     echo "下载 rc4 工具..."
-    curl -sL "$CLOUD_BASE/rc4" -o "$TMP_DIR/rc4"
-    chmod +x "$TMP_DIR/rc4"
+    # 修改3：使用更可靠的下载源
+    download_url="https://raw.githubusercontent.com/lullcrypto/hstools/main/rc4"
+    
+    # 尝试不同方式下载
+    if command -v wget &> /dev/null; then
+        wget -q "$download_url" -O "$TMP_DIR/rc4"
+    else
+        curl -sL "$download_url" -o "$TMP_DIR/rc4"
+    fi
+    
+    # 检查下载是否成功
+    if [ ! -f "$TMP_DIR/rc4" ]; then
+        echo "错误：无法下载 rc4 工具，请检查网络连接"
+        echo "备用方案：请手动下载 rc4 并放在 $TMP_DIR/"
+        exit 1
+    fi
+    
+    # 添加执行权限
+    chmod +x "$TMP_DIR/rc4" || {
+        echo "错误：无法设置执行权限"
+        exit 1
+    }
 fi
 
 # 配置区
@@ -34,32 +53,32 @@ parse_json() {
 }
 
 # 公告区 - 使用云端rc4
-notice=`curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=notice&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}"`
-deNotice=`$TMP_DIR/rc4 $notice $wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key "de"`
-Notices=`parse_json "$deNotice" "app_gg"`
+notice=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=notice&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}")
+deNotice=$("$TMP_DIR/rc4" "$notice" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
+Notices=$(parse_json "$deNotice" "app_gg")
 echo "系统公告:\n${Notices}\n"
 
 # 验证区 - 使用云端rc4
 echo "请输入卡密：(点击屏幕右下角lm弹窗键盘)"
 read kami
-timer=`date +%s`
-android_id=`settings get secure android_id`
-fingerprint=`getprop ro.build.fingerprint`
-imei=`echo -n "${android_id}.${fingerprint}" | md5sum | awk '{print $1}'`
+timer=$(date +%s)
+android_id=$(settings get secure android_id)
+fingerprint=$(getprop ro.build.fingerprint)
+imei=$(echo -n "${android_id}.${fingerprint}" | md5sum | awk '{print $1}')
 value="$RANDOM${timer}"
-sign=`echo -n "kami=${kami}&markcode=${imei}&t=${timer}&${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}" | md5sum | awk '{print $1}'`
-data=`$TMP_DIR/rc4 "kami=${kami}&markcode=${imei}&t=${timer}&sign=${sign}&value=${value}&${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}" $wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key "en"`
-logon=`curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=kmlogin&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}&data=${data}"`
-deLogon=`$TMP_DIR/rc4 $logon $wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key "de"`
-wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code=`parse_json "$deLogon" "w5d07995fdb2bec61115db96b0ce4ca60"`
-if  [ "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" -eq 20683 ]; then
-    kamid=`parse_json "$deLogon" "s62a623d09194343be26a248765f08e5d"`
-    timec=`parse_json "$deLogon" "i7c24630fc3c306390b8e7982a913da12"`
-    check=`echo -n  "${timec}${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}${value}20683${kamid}${sign}" | md5sum | awk '{print $1}'`
-    checks=`parse_json "$deLogon" "tf641c34cebe5ace4585236ad3457a425"`
-    if  [ "$check" == "$checks" ]; then
-        vip=`parse_json "$deLogon" "r1d6d67aea92b2fbd5174d82cff89140e"`
-        vips=`date -d @$vip +"%Y-%m-%d %H:%M:%S"`
+sign=$(echo -n "kami=${kami}&markcode=${imei}&t=${timer}&${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}" | md5sum | awk '{print $1}')
+data=$("$TMP_DIR/rc4" "kami=${kami}&markcode=${imei}&t=${timer}&sign=${sign}&value=${value}&${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "en")
+logon=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=kmlogin&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}&data=${data}")
+deLogon=$("$TMP_DIR/rc4" "$logon" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
+wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code=$(parse_json "$deLogon" "w5d07995fdb2bec61115db96b0ce4ca60")
+if [ "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" -eq 20683 ]; then
+    kamid=$(parse_json "$deLogon" "s62a623d09194343be26a248765f08e5d")
+    timec=$(parse_json "$deLogon" "i7c24630fc3c306390b8e7982a913da12")
+    check=$(echo -n  "${timec}${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}${value}20683${kamid}${sign}" | md5sum | awk '{print $1}')
+    checks=$(parse_json "$deLogon" "tf641c34cebe5ace4585236ad3457a425")
+    if [ "$check" == "$checks" ]; then
+        vip=$(parse_json "$deLogon" "r1d6d67aea92b2fbd5174d82cff89140e")
+        vips=$(date -d @$vip +"%Y-%m-%d %H:%M:%S")
         clear
         echo "登录成功，到期时间：${vips}"
     else
