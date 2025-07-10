@@ -2,38 +2,42 @@
 # 微验网络验证部分保持不变
 echo -e "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
 
-# 修改1：使用 Termux 有权限的目录
-TMP_DIR="$HOME/.cache/hstool" # 使用用户主目录下的缓存目录
+# 按照您的要求，将路径放在/storage/emulated/0/幻穗制作区
+TMP_DIR="/storage/emulated/0/幻穗制作区/hstool"
 
 # 确保临时目录存在
+echo "创建目录: $TMP_DIR"
 mkdir -p "$TMP_DIR" || {
-    echo "错误：无法创建目录 $TMP_DIR"
+    echo "错误：无法创建目录 $TMP_DIR，请确保Termux有存储权限"
+    echo "请运行: termux-setup-storage 并允许存储访问"
     exit 1
 }
 
-# 修改2：添加详细的错误处理
+# 检查并下载rc4工具
 if ! [ -e "$TMP_DIR/rc4" ]; then
-    echo "下载 rc4 工具..."
-    # 修改3：使用更可靠的下载源
+    echo "下载 rc4 工具到 $TMP_DIR..."
     download_url="https://raw.githubusercontent.com/lullcrypto/hstools/main/rc4"
     
-    # 尝试不同方式下载
-    if command -v wget &> /dev/null; then
+    # 使用curl或wget下载
+    if command -v curl &> /dev/null; then
+        curl -sL "$download_url" -o "$TMP_DIR/rc4" || {
+            echo "错误：curl下载失败"
+            exit 1
+        }
+    elif command -v wget &> /dev/null; then
         wget -q "$download_url" -O "$TMP_DIR/rc4" || {
-            echo "错误：wget 下载失败"
+            echo "错误：wget下载失败"
             exit 1
         }
     else
-        curl -sL "$download_url" -o "$TMP_DIR/rc4" || {
-            echo "错误：curl 下载失败"
-            exit 1
-        }
+        echo "错误：没有找到curl或wget，请安装其中一个"
+        exit 1
     fi
     
     # 检查下载是否成功
     if [ ! -f "$TMP_DIR/rc4" ]; then
-        echo "错误：无法下载 rc4 工具，请检查网络连接"
-        echo "备用方案：请手动下载 rc4 并放在 $TMP_DIR/"
+        echo "错误：无法下载rc4工具，请检查网络连接"
+        echo "备用方案：请手动下载rc4并放在 $TMP_DIR/"
         echo "下载链接: $download_url"
         exit 1
     fi
@@ -43,7 +47,7 @@ if ! [ -e "$TMP_DIR/rc4" ]; then
         echo "错误：无法设置执行权限"
         exit 1
     }
-    echo "rc4 工具已下载并设置权限"
+    echo "rc4工具已下载并设置权限"
 fi
 
 # 配置区
@@ -62,15 +66,15 @@ parse_json() {
   echo "$value"
 }
 
-# 公告区 - 使用云端rc4
+# 公告区 - 使用rc4
 echo "获取系统公告..."
 notice=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=notice&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}")
 deNotice=$("$TMP_DIR/rc4" "$notice" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
 Notices=$(parse_json "$deNotice" "app_gg")
 echo -e "系统公告:\n${Notices}\n"
 
-# 验证区 - 使用云端rc4
-echo "请输入卡密：(点击屏幕右下角lm弹窗键盘)"
+# 验证区 - 使用rc4
+echo "请输入卡密："
 read kami
 timer=$(date +%s)
 android_id=$(settings get secure android_id)
@@ -83,7 +87,7 @@ logon=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=kmlogin&app=${wfb
 deLogon=$("$TMP_DIR/rc4" "$logon" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
 wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code=$(parse_json "$deLogon" "w5d07995fdb2bec61115db96b0ce4ca60")
 
-# 修改4：添加验证码检查
+# 检查验证码
 if [ -n "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" ] && [ "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" -eq 20683 ]; then
     kamid=$(parse_json "$deLogon" "s62a623d09194343be26a248765f08e5d")
     timec=$(parse_json "$deLogon" "i7c24630fc3c306390b8e7982a913da12")
@@ -91,8 +95,8 @@ if [ -n "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" ] && [ "$wfb5cfb05da0f55843
     checks=$(parse_json "$deLogon" "tf641c34cebe5ace4585236ad3457a425")
     if [ "$check" == "$checks" ]; then
         vip=$(parse_json "$deLogon" "r1d6d67aea92b2fbd5174d82cff89140e")
-        # 修改5：添加日期转换兼容性
         if [ -n "$vip" ]; then
+            # 日期转换兼容不同系统
             if date --version >/dev/null 2>&1; then
                 vips=$(date -d "@$vip" +"%Y-%m-%d %H:%M:%S")
             else
@@ -114,6 +118,8 @@ else
 fi
 
 echo "验证成功后程序开始执行..."
+
+# ... 以下部分保持不变 ...
 
 
 #!/bin/bash
