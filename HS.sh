@@ -2,14 +2,13 @@
 # 微验网络验证部分保持不变
 echo -e "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
 
-# 按照您的要求，将路径放在/storage/emulated/0/幻穗制作区
-TMP_DIR="/storage/emulated/0/幻穗制作区/hstool"
+# 使用安全且有权限的目录
+TMP_DIR="$HOME/hstool_tmp"  # 使用用户主目录下的临时目录
 
 # 确保临时目录存在
 echo "创建目录: $TMP_DIR"
 mkdir -p "$TMP_DIR" || {
-    echo "错误：无法创建目录 $TMP_DIR，请确保Termux有存储权限"
-    echo "请运行: termux-setup-storage 并允许存储访问"
+    echo "错误：无法创建目录 $TMP_DIR"
     exit 1
 }
 
@@ -119,15 +118,7 @@ fi
 
 echo "验证成功后程序开始执行..."
 
-# ... 以下部分保持不变 ...
-
-
-#!/bin/bash
-# HSTOOL - 幻穗多功能工具
-# 作者：幻穗
-# 快手号：Luisner866x
-# TG：HSMH886L
-
+# HSTOOL 主程序
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -184,15 +175,21 @@ first_run() {
     )
     
     for dir in "${base_dirs[@]}"; do
-        mkdir -p "$dir"
+        mkdir -p "$dir" || {
+            echo -e "  ${RED}✗${NC} 创建目录失败: $dir"
+            continue
+        }
         echo -e "  ${GREEN}✓${NC} 创建目录: $dir"
         sleep 0.1
     done
     
     echo -e "${GREEN}✔ 首次运行设置完成！${NC}"
-    touch "/storage/emulated/0/幻穗制作区/.first_run_complete"
+    touch "/storage/emulated/0/幻穗制作区/.first_run_complete" || {
+        echo "警告：无法创建标记文件，但目录已创建"
+    }
     sleep 2
 }
+
 # 显示欢迎界面
 welcome_screen() {
     clear
@@ -277,6 +274,10 @@ main_menu() {
     echo -e "$(border_color)║ ${RED}[0] 退出工具                                             ${NC}$(border_color)║${NC}"
     echo -e "$(border_color)╚══════════════════════════════════════════════════════════════════╝${NC}"
 }
+
+# 云端配置
+CLOUD_BASE="https://raw.githubusercontent.com/lullcrypto/hstools/main"
+
 # 从云端执行脚本
 cloud_exec() {
     script_name=$1
@@ -285,10 +286,28 @@ cloud_exec() {
     # 下载脚本到临时目录
     script_path="$TMP_DIR/$script_name"
     echo -e "${CYAN}▶ 从云端下载: $script_name${NC}"
-    curl -sL "$CLOUD_BASE/$script_name" -o "$script_path"
+    
+    # 使用curl或wget下载
+    if command -v curl &> /dev/null; then
+        curl -sL "$CLOUD_BASE/$script_name" -o "$script_path" || {
+            echo "错误：下载失败 $script_name"
+            return 1
+        }
+    elif command -v wget &> /dev/null; then
+        wget -q "$CLOUD_BASE/$script_name" -O "$script_path" || {
+            echo "错误：下载失败 $script_name"
+            return 1
+        }
+    else
+        echo "错误：没有找到curl或wget"
+        return 1
+    fi
     
     # 设置执行权限
-    chmod +x "$script_path"
+    chmod +x "$script_path" || {
+        echo "错误：无法设置执行权限"
+        return 1
+    }
     
     # 根据类型执行
     case $script_type in
@@ -307,37 +326,38 @@ cloud_exec() {
     esac
     
     # 清理临时文件
-    rm -f "$script_path"
+    rm -f "$script_path" || {
+        echo "警告：无法删除临时文件 $script_path"
+    }
 }
 
 # 功能映射表
 declare -A func_map=(
     [1]="dat解包.sh sh"
     [2]="dat打包.sh sh"
-    [3]="限制uexp解包 py"
-    [4]="限制uexp打包 py"
-    [5]="无限制uexp解包 py"
-    [6]="无限制uexp打包 py"
-    [7]="自动修改手持火焰刀 py"
-    [8]="大厅动作.头像框.播报 py"
-    [9]="幻穗dat提取（不会看快手） py"
-    [10]="幻穗自动写配料表 py"
-    [11]="写枪械配置（快） py"
-    [12]="自动局内伪实体 py"
-    [13]="自动地铁原皮 py"
-    [14]="自动查找dat py"
-    [15]="写地铁配置 py"
-    [16]="免root输出 py"
-    [17]="h格式转换 py"
-    [18]="自动语音包 py"
-    [19]="衣服dat py"
-    [20]="仓库品质 py"
+    [3]="限制uexp解包.py py"
+    [4]="限制uexp打包.py py"
+    [5]="无限制uexp解包.py py"
+    [6]="无限制uexp打包.py py"
+    [7]="自动修改手持火焰刀.py py"
+    [8]="大厅动作.头像框.播报.py py"
+    [9]="幻穗dat提取（不会看快手）.py py"
+    [10]="幻穗自动写配料表.py py"
+    [11]="写枪械配置（快）.py py"
+    [12]="自动局内伪实体.py py"
+    [13]="自动地铁原皮.py py"
+    [14]="自动查找dat.py py"
+    [15]="写地铁配置.py py"
+    [16]="免root输出.py py"
+    [17]="h格式转换.py py"
+    [18]="自动语音包.py py"
+    [19]="衣服dat.py py"
+    [20]="仓库品质.py py"
     [21]="大厅水印 py"
-    [22]="局内水印 py"
-    [23]="搜索 py"
-    [24]="伪实体 py"
+    [22]="局内水印.py py"
+    [23]="搜索.py py"
+    [24]="伪实体.py py"
 )
-
 
 # 执行功能
 execute_function() {
