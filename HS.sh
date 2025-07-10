@@ -1,13 +1,15 @@
-
 #!/bin/bash
 # 微验网络验证部分保持不变
-echo "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
+echo -e "\n欢迎使用微验网络验证\n微验官网：llua.cn\n加载中...\n"
 
-# 修改1：使用 Termux 的可写目录
-TMP_DIR="$PREFIX/tmp/hstool" # 使用 Termux 的标准临时目录
+# 修改1：使用 Termux 有权限的目录
+TMP_DIR="$HOME/.cache/hstool" # 使用用户主目录下的缓存目录
 
 # 确保临时目录存在
-mkdir -p $TMP_DIR
+mkdir -p "$TMP_DIR" || {
+    echo "错误：无法创建目录 $TMP_DIR"
+    exit 1
+}
 
 # 修改2：添加详细的错误处理
 if ! [ -e "$TMP_DIR/rc4" ]; then
@@ -17,15 +19,22 @@ if ! [ -e "$TMP_DIR/rc4" ]; then
     
     # 尝试不同方式下载
     if command -v wget &> /dev/null; then
-        wget -q "$download_url" -O "$TMP_DIR/rc4"
+        wget -q "$download_url" -O "$TMP_DIR/rc4" || {
+            echo "错误：wget 下载失败"
+            exit 1
+        }
     else
-        curl -sL "$download_url" -o "$TMP_DIR/rc4"
+        curl -sL "$download_url" -o "$TMP_DIR/rc4" || {
+            echo "错误：curl 下载失败"
+            exit 1
+        }
     fi
     
     # 检查下载是否成功
     if [ ! -f "$TMP_DIR/rc4" ]; then
         echo "错误：无法下载 rc4 工具，请检查网络连接"
         echo "备用方案：请手动下载 rc4 并放在 $TMP_DIR/"
+        echo "下载链接: $download_url"
         exit 1
     fi
     
@@ -34,6 +43,7 @@ if ! [ -e "$TMP_DIR/rc4" ]; then
         echo "错误：无法设置执行权限"
         exit 1
     }
+    echo "rc4 工具已下载并设置权限"
 fi
 
 # 配置区
@@ -53,10 +63,11 @@ parse_json() {
 }
 
 # 公告区 - 使用云端rc4
+echo "获取系统公告..."
 notice=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=notice&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}")
 deNotice=$("$TMP_DIR/rc4" "$notice" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
 Notices=$(parse_json "$deNotice" "app_gg")
-echo "系统公告:\n${Notices}\n"
+echo -e "系统公告:\n${Notices}\n"
 
 # 验证区 - 使用云端rc4
 echo "请输入卡密：(点击屏幕右下角lm弹窗键盘)"
@@ -71,27 +82,38 @@ data=$("$TMP_DIR/rc4" "kami=${kami}&markcode=${imei}&t=${timer}&sign=${sign}&val
 logon=$(curl -s "${wfb5cfb05da0f55843e5dbd28554a92e1_wyUrl}?id=kmlogin&app=${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppid}&data=${data}")
 deLogon=$("$TMP_DIR/rc4" "$logon" "$wfb5cfb05da0f55843e5dbd28554a92e1_wyRc4key" "de")
 wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code=$(parse_json "$deLogon" "w5d07995fdb2bec61115db96b0ce4ca60")
-if [ "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" -eq 20683 ]; then
+
+# 修改4：添加验证码检查
+if [ -n "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" ] && [ "$wfb5cfb05da0f55843e5dbd28554a92e1_wy_Code" -eq 20683 ]; then
     kamid=$(parse_json "$deLogon" "s62a623d09194343be26a248765f08e5d")
     timec=$(parse_json "$deLogon" "i7c24630fc3c306390b8e7982a913da12")
     check=$(echo -n  "${timec}${wfb5cfb05da0f55843e5dbd28554a92e1_wyAppkey}${value}20683${kamid}${sign}" | md5sum | awk '{print $1}')
     checks=$(parse_json "$deLogon" "tf641c34cebe5ace4585236ad3457a425")
     if [ "$check" == "$checks" ]; then
         vip=$(parse_json "$deLogon" "r1d6d67aea92b2fbd5174d82cff89140e")
-        vips=$(date -d @$vip +"%Y-%m-%d %H:%M:%S")
-        clear
-        echo "登录成功，到期时间：${vips}"
+        # 修改5：添加日期转换兼容性
+        if [ -n "$vip" ]; then
+            if date --version >/dev/null 2>&1; then
+                vips=$(date -d "@$vip" +"%Y-%m-%d %H:%M:%S")
+            else
+                vips=$(date -r "$vip" +"%Y-%m-%d %H:%M:%S")
+            fi
+            clear
+            echo "登录成功，到期时间：${vips}"
+        else
+            echo "登录成功，但无法获取到期时间"
+        fi
     else
         echo "校验失败"
-        exit
+        exit 1
     fi
 else
-    parse_json "$deLogon" "vf8c449deeaa257c7bddfdfa8d67dadf8"
-    exit
+    error_msg=$(parse_json "$deLogon" "vf8c449deeaa257c7bddfdfa8d67dadf8")
+    echo "验证失败: ${error_msg}"
+    exit 1
 fi
 
 echo "验证成功后程序开始执行..."
-
 
 
 #!/bin/bash
